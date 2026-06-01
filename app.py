@@ -115,18 +115,18 @@ try:
     
     with left_chart:
         st.subheader("기온 분포 및 밀도 (히스토그램)")
-        # 기온의 이동을 보여주는 히스토그램/분포도
+        # [해결 완료] opacity 매개변수를 px.histogram 내부로 이동하여 에러를 예방했습니다.
         fig_dist = px.histogram(
             filtered_data, 
             x="Avg_Temp", 
             color="Era", 
             barmode="overlay",
             marginal="box",
+            opacity=0.6,  # 이 위치로 수정되었습니다.
             color_discrete_map={'1950년대': '#3498db', '현대 (2010년대)': '#e74c3c'},
             labels={'Avg_Temp': '일평균 기온 (°C)', 'count': '일수 (Days)', 'Era': '시대'}
         )
         fig_dist.update_layout(
-            opacity=0.6, 
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             yaxis_title="일수 (Days)"
         )
@@ -134,7 +134,6 @@ try:
 
     with right_chart:
         st.subheader("계절별 기온 범위 비교 (박스플롯)")
-        # 매크로 뷰 분석을 위한 계절별 박스플롯
         fig_box = px.box(
             data if selected_season == '전체 계절' else filtered_data,
             x="Season",

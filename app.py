@@ -5,15 +5,15 @@ import plotly.graph_objects as go
 
 # 페이지 환경 설정
 st.set_page_config(
-    page_title="기후 변화 분석: 1950년대 vs 현대",
+    page_title="기후 변화 분석: 1960년대 vs 현대",
     page_icon="🌡️",
     layout="wide"
 )
 
-# 제목 및 설명
+# 제목 및 설명 (마크다운 취소선 방지를 위해 물결표 앞에 백슬래시 적용)
 st.title("🌡️ 시대별 계절 기온 변화 분석 대시보드")
 st.markdown("""
-이 대시보드는 1950년대(1950\~1959년)와 현대(2010\~2019년)의 서울(지점 108) 일별 기온 데이터를 바탕으로, 사계절의 기후 변화를 비교 분석합니다.
+이 대시보드는 **1960년대(1960\~1969년)**와 **현대(2010\~2019년)**의 서울(지점 108) 일별 기온 데이터를 바탕으로, 사계절의 기후 변화를 비교 분석합니다.
 """)
 
 # 성능 향상을 위한 데이터 로드 및 캐싱
@@ -39,10 +39,10 @@ def load_data():
     df['Year'] = df['Date'].dt.year
     df['Month'] = df['Date'].dt.month
     
-    # 시대(Era) 분류 정의
+    # 시대(Era) 분류 정의 (1950년대에서 1960년대로 변경)
     def assign_era(year):
-        if 1950 <= year <= 1959:
-            return '1950년대'
+        if 1960 <= year <= 1969:
+            return '1960년대'
         elif 2010 <= year <= 2019:
             return '현대 (2010년대)'
         return None
@@ -86,26 +86,27 @@ try:
     
     col1, col2, col3 = st.columns(3)
     
+    # 안내 문구도 '1960년대 대비'로 통일했습니다.
     with col1:
-        diff_avg = round(summary.get('현대 (2010년대)', 0) - summary.get('1950년대', 0), 2)
+        diff_avg = round(summary.get('현대 (2010년대)', 0) - summary.get('1960년대', 0), 2)
         st.metric(
             label="일평균 기온", 
             value=f"{summary.get('현대 (2010년대)', '데이터 없음')} °C", 
-            delta=f"1950년대 대비 {diff_avg:+g} °C"
+            delta=f"1960년대 대비 {diff_avg:+g} °C"
         )
     with col2:
-        diff_max = round(max_summary.get('현대 (2010년대)', 0) - max_summary.get('1950년대', 0), 2)
+        diff_max = round(max_summary.get('현대 (2010년대)', 0) - max_summary.get('1960년대', 0), 2)
         st.metric(
             label="평균 최고 기온", 
             value=f"{max_summary.get('현대 (2010년대)', '데이터 없음')} °C", 
-            delta=f"1950년대 대비 {diff_max:+g} °C"
+            delta=f"1960년대 대비 {diff_max:+g} °C"
         )
     with col3:
-        diff_min = round(min_summary.get('현대 (2010년대)', 0) - min_summary.get('1950년대', 0), 2)
+        diff_min = round(min_summary.get('현대 (2010년대)', 0) - min_summary.get('1960년대', 0), 2)
         st.metric(
             label="평균 최저 기온", 
             value=f"{min_summary.get('현대 (2010년대)', '데이터 없음')} °C", 
-            delta=f"1950년대 대비 {diff_min:+g} °C"
+            delta=f"1960년대 대비 {diff_min:+g} °C"
         )
 
     st.markdown("---")
@@ -115,15 +116,14 @@ try:
     
     with left_chart:
         st.subheader("기온 분포 및 밀도 (히스토그램)")
-        # [해결 완료] opacity 매개변수를 px.histogram 내부로 이동하여 에러를 예방했습니다.
         fig_dist = px.histogram(
             filtered_data, 
             x="Avg_Temp", 
             color="Era", 
             barmode="overlay",
             marginal="box",
-            opacity=0.6,  # 이 위치로 수정되었습니다.
-            color_discrete_map={'1950년대': '#3498db', '현대 (2010년대)': '#e74c3c'},
+            opacity=0.6,
+            color_discrete_map={'1960년대': '#3498db', '현대 (2010년대)': '#e74c3c'},
             labels={'Avg_Temp': '일평균 기온 (°C)', 'count': '일수 (Days)', 'Era': '시대'}
         )
         fig_dist.update_layout(
@@ -139,47 +139,32 @@ try:
             x="Season",
             y="Avg_Temp",
             color="Era",
-            color_discrete_map={'1950년대': '#3498db', '현대 (2010년대)': '#e74c3c'},
+            color_discrete_map={'1960년대': '#3498db', '현대 (2010년대)': '#e74c3c'},
             category_orders={"Season": ['봄 (3-5월)', '여름 (6-8월)', '가을 (9-11월)', '겨울 (12-2월)']},
             labels={'Season': '계절', 'Avg_Temp': '일평균 기온 (°C)', 'Era': '시대'}
         )
         fig_box.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         st.plotly_chart(fig_box, use_container_width=True)
 
-# --- 연도별 추세선 ---
-    st.subheader("연도별 평균 기온 타임라인 (1950년대 vs 현대)")
+    # --- 연도별 추세선 ---
+    st.subheader("연도별 평균 기온 타임라인 (1960년대 vs 현대)")
     timeline_data = filtered_data.groupby(['Year', 'Era'])['Avg_Temp'].mean().reset_index()
     
-    # [수정] 연도를 문자열(String)로 변환하여 축이 끊어지지 않고 바로 이어지도록 만듭니다.
+    # 축 밀착을 위한 문자열 변환 및 카테고리 축 설정 유지
     timeline_data['Year_str'] = timeline_data['Year'].astype(str)
     
     fig_line = go.Figure()
-    
-    # 1950년대 선
-    df_50s = timeline_data[timeline_data['Era'] == '1950년대']
-    fig_line.add_trace(go.Scatter(
-        x=df_50s['Year_str'], 
-        y=df_50s['Avg_Temp'], 
-        name='1950년대', 
-        mode='lines+markers',  # 점을 추가해서 끊어짐을 명확히 표시
-        line=dict(color='#3498db', width=3)
-    ))
-    
+    # 1960년대 선
+    df_60s = timeline_data[timeline_data['Era'] == '1960년대']
+    fig_line.add_trace(go.Scatter(x=df_60s['Year_str'], y=df_60s['Avg_Temp'], name='1960년대', mode='lines+markers', line=dict(color='#3498db', width=3)))
     # 현대 선
     df_mod = timeline_data[timeline_data['Era'] == '현대 (2010년대)']
-    fig_line.add_trace(go.Scatter(
-        x=df_mod['Year_str'], 
-        y=df_mod['Avg_Temp'], 
-        name='현대 (2010년대)', 
-        mode='lines+markers',  # 점을 추가해서 끊어짐을 명확히 표시
-        line=dict(color='#e74c3c', width=3)
-    ))
+    fig_line.add_trace(go.Scatter(x=df_mod['Year_str'], y=df_mod['Avg_Temp'], name='현대 (2010년대)', mode='lines+markers', line=dict(color='#e74c3c', width=3)))
     
     fig_line.update_layout(
         xaxis_title="연도 (Year)",
         yaxis_title="연평균 기온 (°C)",
-        # [수정] X축 타입을 'category'로 지정하여 중간의 빈 연도(1960~2009)를 화면에서 생략합니다.
-        xaxis=dict(type='category'), 
+        xaxis=dict(type='category'),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
     )
     st.plotly_chart(fig_line, use_container_width=True)

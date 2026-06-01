@@ -146,22 +146,40 @@ try:
         fig_box.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         st.plotly_chart(fig_box, use_container_width=True)
 
-    # --- 연도별 추세선 ---
+# --- 연도별 추세선 ---
     st.subheader("연도별 평균 기온 타임라인 (1950년대 vs 현대)")
     timeline_data = filtered_data.groupby(['Year', 'Era'])['Avg_Temp'].mean().reset_index()
     
+    # [수정] 연도를 문자열(String)로 변환하여 축이 끊어지지 않고 바로 이어지도록 만듭니다.
+    timeline_data['Year_str'] = timeline_data['Year'].astype(str)
+    
     fig_line = go.Figure()
+    
     # 1950년대 선
     df_50s = timeline_data[timeline_data['Era'] == '1950년대']
-    fig_line.add_trace(go.Scatter(x=df_50s['Year'], y=df_50s['Avg_Temp'], name='1950년대', line=dict(color='#3498db', width=3)))
+    fig_line.add_trace(go.Scatter(
+        x=df_50s['Year_str'], 
+        y=df_50s['Avg_Temp'], 
+        name='1950년대', 
+        mode='lines+markers',  # 점을 추가해서 끊어짐을 명확히 표시
+        line=dict(color='#3498db', width=3)
+    ))
+    
     # 현대 선
     df_mod = timeline_data[timeline_data['Era'] == '현대 (2010년대)']
-    fig_line.add_trace(go.Scatter(x=df_mod['Year'], y=df_mod['Avg_Temp'], name='현대 (2010년대)', line=dict(color='#e74c3c', width=3)))
+    fig_line.add_trace(go.Scatter(
+        x=df_mod['Year_str'], 
+        y=df_mod['Avg_Temp'], 
+        name='현대 (2010년대)', 
+        mode='lines+markers',  # 점을 추가해서 끊어짐을 명확히 표시
+        line=dict(color='#e74c3c', width=3)
+    ))
     
     fig_line.update_layout(
         xaxis_title="연도 (Year)",
         yaxis_title="연평균 기온 (°C)",
-        xaxis=dict(tickmode='linear'),
+        # [수정] X축 타입을 'category'로 지정하여 중간의 빈 연도(1960~2009)를 화면에서 생략합니다.
+        xaxis=dict(type='category'), 
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
     )
     st.plotly_chart(fig_line, use_container_width=True)

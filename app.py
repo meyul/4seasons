@@ -3,60 +3,59 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
-# Set page configuration
+# 페이지 환경 설정
 st.set_page_config(
-    page_title="Climate Shift: 1950s vs Modern Era",
+    page_title="기후 변화 분석: 1950년대 vs 현대",
     page_icon="🌡️",
     layout="wide"
 )
 
-# Title and Description
-st.title("🌡️ Historical Climate Shift Analysis")
+# 제목 및 설명
+st.title("🌡️ 시대별 계절 기온 변화 분석 대시보드")
 st.markdown("""
-This dashboard compares the daily temperature records of Seoul (Station 108) between the **1950s (1950-1959)** and the **Modern Era (2010-2019)** across all four seasons. 
+이 대시보드는 **1950년대(1950~1959년)**와 **현대(2010~2019년)**의 서울(지점 108) 일별 기온 데이터를 바탕으로, 사계절의 기후 변화를 비교 분석합니다.
 """)
 
-# Load and cache data for performance
+# 성능 향상을 위한 데이터 로드 및 캐싱
 @st.cache_data
 def load_data():
-    # Load dataset, stripping potential whitespace from column names
+    # 데이터셋 불러오기 및 컬럼명 공백 제거
     df = pd.read_csv("ta_20260601093156.csv")
     df.columns = df.columns.str.strip()
     
-    # Clean the Date column (remove tabs/quotes if present)
+    # 날짜 컬럼 정제 (탭문자 및 따옴표 제거)
     df['날짜'] = df['날짜'].astype(str).str.replace(r'[\t"\s]', '', regex=True)
     df['Date'] = pd.to_datetime(df['날짜'], errors='coerce')
     df = df.dropna(subset=['Date'])
     
-    # Rename columns for ease of use
+    # 분석용 영문 컬럼명 매핑 (코드 안정성 유지)
     df = df.rename(columns={
         '평균기온(℃)': 'Avg_Temp',
         '최저기온(℃)': 'Min_Temp',
         '최고기온(℃)': 'Max_Temp'
     })
     
-    # Extract Year and Month
+    # 연도 및 월 추출
     df['Year'] = df['Date'].dt.year
     df['Month'] = df['Date'].dt.month
     
-    # Define Eras
+    # 시대(Era) 분류 정의
     def assign_era(year):
         if 1950 <= year <= 1959:
-            return '1950s'
+            return '1950년대'
         elif 2010 <= year <= 2019:
-            return 'Modern Era (2010s)'
+            return '현대 (2010년대)'
         return None
     
     df['Era'] = df['Year'].apply(assign_era)
     df = df.dropna(subset=['Era'])
     
-    # Define Korean Seasons
-    # Spring: Mar-May, Summer: Jun-Aug, Autumn: Sep-Nov, Winter: Dec-Feb
+    # 계절 분류 정의 (봄: 3~5월, 여름: 6~8월, 가을: 9~11월, 겨울: 12~2월)
     def assign_season(month):
-        if month in [3, 4, 5]: return 'Spring (Mar-May)'
-        elif month in [6, 7, 8]: return 'Summer (Jun-Aug)'
-        elif month in [9, 10, 11]: return 'Autumn (Sep-Nov)'
-        else: return 'Winter (Dec-Feb)'
+        if month in [3, 4, 5]: return '봄 (3-5월)'
+        elif month in [6, 7, 8]: return '여름 (6-8월)'
+        elif month in [9, 10, 11]: return '가을 (9-11월)'
+        else: return '겨울 (12-2월)'
         
     df['Season'] = df['Month'].apply(assign_season)
     return df
@@ -64,23 +63,23 @@ def load_data():
 try:
     data = load_data()
     
-    # --- SIDEBAR CONTROLS ---
-    st.sidebar.header("Filter Options")
+    # --- 사이드바 제어 조작 ---
+    st.sidebar.header("필터 옵션")
     selected_season = st.sidebar.selectbox(
-        "Select a Season to Inspect:",
-        ['All Seasons', 'Spring (Mar-May)', 'Summer (Jun-Aug)', 'Autumn (Sep-Nov)', 'Winter (Dec-Feb)']
+        "분석할 계절을 선택하세요:",
+        ['전체 계절', '봄 (3-5월)', '여름 (6-8월)', '가을 (9-11월)', '겨울 (12-2월)']
     )
     
-    # Filter dataset based on selection
-    if selected_season != 'All Seasons':
+    # 선택한 계절에 따라 데이터 필터링
+    if selected_season != '전체 계절':
         filtered_data = data[data['Season'] == selected_season]
     else:
         filtered_data = data
 
-    # --- KPI METRICS ---
-    st.subheader(f"📊 Summary Statistics: {selected_season}")
+    # --- KPI 주요 지표 통계 ---
+    st.subheader(f"📊 주요 기온 통계 요약: {selected_season}")
     
-    # Calculate seasonal averages per Era
+    # 시대별 기온 평균 계산
     summary = filtered_data.groupby('Era')['Avg_Temp'].mean().round(2)
     max_summary = filtered_data.groupby('Era')['Max_Temp'].mean().round(2)
     min_summary = filtered_data.groupby('Era')['Min_Temp'].mean().round(2)
@@ -88,80 +87,86 @@ try:
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        diff_avg = round(summary.get('Modern Era (2010s)', 0) - summary.get('1950s', 0), 2)
+        diff_avg = round(summary.get('현대 (2010년대)', 0) - summary.get('1950년대', 0), 2)
         st.metric(
-            label="Average Temperature", 
-            value=f"{summary.get('Modern Era (2010s', 'N/A')} °C", 
-            delta=f"{diff_avg:+g} °C vs 1950s"
+            label="일평균 기온", 
+            value=f"{summary.get('현대 (2010년대)', '데이터 없음')} °C", 
+            delta=f"1950년대 대비 {diff_avg:+g} °C"
         )
     with col2:
-        diff_max = round(max_summary.get('Modern Era (2010s)', 0) - max_summary.get('1950s', 0), 2)
+        diff_max = round(max_summary.get('현대 (2010년대)', 0) - max_summary.get('1950년대', 0), 2)
         st.metric(
-            label="Average Max Temperature", 
-            value=f"{max_summary.get('Modern Era (2010s)', 'N/A')} °C", 
-            delta=f"{diff_max:+g} °C vs 1950s"
+            label="평균 최고 기온", 
+            value=f"{max_summary.get('현대 (2010년대)', '데이터 없음')} °C", 
+            delta=f"1950년대 대비 {diff_max:+g} °C"
         )
     with col3:
-        diff_min = round(min_summary.get('Modern Era (2010s)', 0) - min_summary.get('1950s', 0), 2)
+        diff_min = round(min_summary.get('현대 (2010년대)', 0) - min_summary.get('1950년대', 0), 2)
         st.metric(
-            label="Average Min Temperature", 
-            value=f"{min_summary.get('Modern Era (2010s)', 'N/A')} °C", 
-            delta=f"{diff_min:+g} °C vs 1950s"
+            label="평균 최저 기온", 
+            value=f"{min_summary.get('현대 (2010년대)', '데이터 없음')} °C", 
+            delta=f"1950년대 대비 {diff_min:+g} °C"
         )
 
     st.markdown("---")
 
-    # --- VISUALIZATIONS ---
+    # --- 시각화 차트 ---
     left_chart, right_chart = st.columns(2)
     
     with left_chart:
-        st.subheader("Temperature Distributions (Density)")
-        # Histogram/Density plot to show shifts in temperatures
+        st.subheader("기온 분포 및 밀도 (히스토그램)")
+        # 기온의 이동을 보여주는 히스토그램/분포도
         fig_dist = px.histogram(
             filtered_data, 
             x="Avg_Temp", 
             color="Era", 
             barmode="overlay",
             marginal="box",
-            color_discrete_map={'1950s': '#3498db', 'Modern Era (2010s)': '#e74c3c'},
-            labels={'Avg_Temp': 'Daily Average Temperature (°C)', 'count': 'Days Count'}
+            color_discrete_map={'1950년대': '#3498db', '현대 (2010년대)': '#e74c3c'},
+            labels={'Avg_Temp': '일평균 기온 (°C)', 'count': '일수 (Days)', 'Era': '시대'}
         )
-        fig_dist.update_layout(opacity=0.6, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+        fig_dist.update_layout(
+            opacity=0.6, 
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            yaxis_title="일수 (Days)"
+        )
         st.plotly_chart(fig_dist, use_container_width=True)
 
     with right_chart:
-        st.subheader("Seasonal Temperature Ranges")
-        # Box plot broken down by seasons for macro view
+        st.subheader("계절별 기온 범위 비교 (박스플롯)")
+        # 매크로 뷰 분석을 위한 계절별 박스플롯
         fig_box = px.box(
-            data if selected_season == 'All Seasons' else filtered_data,
+            data if selected_season == '전체 계절' else filtered_data,
             x="Season",
             y="Avg_Temp",
             color="Era",
-            color_discrete_map={'1950s': '#3498db', 'Modern Era (2010s)': '#e74c3c'},
-            category_orders={"Season": ['Spring (Mar-May)', 'Summer (Jun-Aug)', 'Autumn (Sep-Nov)', 'Winter (Dec-Feb)']}
+            color_discrete_map={'1950년대': '#3498db', '현대 (2010년대)': '#e74c3c'},
+            category_orders={"Season": ['봄 (3-5월)', '여름 (6-8월)', '가을 (9-11월)', '겨울 (12-2월)']},
+            labels={'Season': '계절', 'Avg_Temp': '일평균 기온 (°C)', 'Era': '시대'}
         )
         fig_box.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         st.plotly_chart(fig_box, use_container_width=True)
 
-    # --- RECENT TREND LINE ---
-    st.subheader("Yearly Averages Timeline (1950s vs Modern Era)")
+    # --- 연도별 추세선 ---
+    st.subheader("연도별 평균 기온 타임라인 (1950년대 vs 현대)")
     timeline_data = filtered_data.groupby(['Year', 'Era'])['Avg_Temp'].mean().reset_index()
     
     fig_line = go.Figure()
-    # 1950s Line
-    df_50s = timeline_data[timeline_data['Era'] == '1950s']
-    fig_line.add_trace(go.Scatter(x=df_50s['Year'], y=df_50s['Avg_Temp'], name='1950s', line=dict(color='#3498db', width=3)))
-    # Modern Line
-    df_mod = timeline_data[timeline_data['Era'] == 'Modern Era (2010s)']
-    fig_line.add_trace(go.Scatter(x=df_mod['Year'], y=df_mod['Avg_Temp'], name='Modern Era', line=dict(color='#e74c3c', width=3)))
+    # 1950년대 선
+    df_50s = timeline_data[timeline_data['Era'] == '1950년대']
+    fig_line.add_trace(go.Scatter(x=df_50s['Year'], y=df_50s['Avg_Temp'], name='1950년대', line=dict(color='#3498db', width=3)))
+    # 현대 선
+    df_mod = timeline_data[timeline_data['Era'] == '현대 (2010년대)']
+    fig_line.add_trace(go.Scatter(x=df_mod['Year'], y=df_mod['Avg_Temp'], name='현대 (2010년대)', line=dict(color='#e74c3c', width=3)))
     
     fig_line.update_layout(
-        xaxis_title="Year",
-        yaxis_title="Mean Temperature (°C)",
-        xaxis=dict(tickmode='linear')
+        xaxis_title="연도 (Year)",
+        yaxis_title="연평균 기온 (°C)",
+        xaxis=dict(tickmode='linear'),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
     )
     st.plotly_chart(fig_line, use_container_width=True)
 
 except Exception as e:
-    st.error(f"Error loading or processing file: {e}")
-    st.info("Please make sure 'ta_20260601093156.csv' is placed in the same repository folder.")
+    st.error(f"파일을 로드하거나 처리하는 중 오류가 발생했습니다: {e}")
+    st.info("데이터 파일('ta_20260601093156.csv')이 동일한 저장소 폴더에 있는지 확인해 주세요.")

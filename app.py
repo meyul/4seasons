@@ -10,25 +10,27 @@ st.set_page_config(
     layout="wide"
 )
 
-# 제목 및 설명 (마크다운 취소선 방지를 위해 물결표 앞에 백슬래시 적용)
+# 제목 및 설명
 st.title("🌡️ 시대별 계절 기온 변화 분석 대시보드")
 st.markdown("""
-이 대시보드는 1960년대(1960\~1969년)와 현대(2010\~2019년)의 서울(지점 108) 일별 기온 데이터를 바탕으로, 사계절의 기후 변화를 비교 분석합니다.
+이 대시보드는 1960년대(1960-1969년)와 현대(2010-2019년)의 서울(지점 108) 일별 기온 데이터를 바탕으로, 사계절의 기후 변화를 비교 분석합니다.
 """)
 
 # 성능 향상을 위한 데이터 로드 및 캐싱
 @st.cache_data
 def load_data():
-    # 데이터셋 불러오기 및 컬럼명 공백 제거
-    df = pd.read_csv("ta_20260601093156.csv")
+    # [수정] 파일 내부의 따옴표(")와 양쪽 공백을 완전히 무시하고 읽어옵니다.
+    df = pd.read_csv("ta_20260601093156.csv", skipinitialspace=True)
     df.columns = df.columns.str.strip()
     
-    # 날짜 컬럼 정제 (탭문자 및 따옴표 제거)
+    # 날짜 컬럼 안의 모든 탭(\t), 따옴표("), 공백을 완벽히 제거
     df['날짜'] = df['날짜'].astype(str).str.replace(r'[\t"\s]', '', regex=True)
+    
+    # 날짜형 데이터로 변환 후 에러 데이터 제거
     df['Date'] = pd.to_datetime(df['날짜'], errors='coerce')
     df = df.dropna(subset=['Date'])
     
-    # 분석용 영문 컬럼명 매핑 (코드 안정성 유지)
+    # 분석용 컬럼명 매핑
     df = df.rename(columns={
         '평균기온(℃)': 'Avg_Temp',
         '최저기온(℃)': 'Min_Temp',
@@ -39,7 +41,7 @@ def load_data():
     df['Year'] = df['Date'].dt.year
     df['Month'] = df['Date'].dt.month
     
-    # 시대(Era) 분류 정의 (1950년대에서 1960년대로 변경)
+    # 시대(Era) 분류 정의
     def assign_era(year):
         if 1960 <= year <= 1969:
             return '1960년대'
@@ -50,7 +52,7 @@ def load_data():
     df['Era'] = df['Year'].apply(assign_era)
     df = df.dropna(subset=['Era'])
     
-    # 계절 분류 정의 (봄: 3~5월, 여름: 6~8월, 가을: 9~11월, 겨울: 12~2월)
+    # 계절 분류 정의
     def assign_season(month):
         if month in [3, 4, 5]: return '봄 (3-5월)'
         elif month in [6, 7, 8]: return '여름 (6-8월)'
@@ -70,7 +72,6 @@ try:
         ['전체 계절', '봄 (3-5월)', '여름 (6-8월)', '가을 (9-11월)', '겨울 (12-2월)']
     )
     
-    # 선택한 계절에 따라 데이터 필터링
     if selected_season != '전체 계절':
         filtered_data = data[data['Season'] == selected_season]
     else:
@@ -84,29 +85,38 @@ try:
     max_summary = filtered_data.groupby('Era')['Max_Temp'].mean().round(2)
     min_summary = filtered_data.groupby('Era')['Min_Temp'].mean().round(2)
     
+    # [수정] 데이터 공백으로 인한 0 도출 및 13도 에러 방지 안전장치 추가
+    val_modern_avg = summary.get('현대 (2010년대)', 0)
+    val_60s_avg = summary.get('1960년대', 0)
+    
+    val_modern_max = max_summary.get('현대 (2010년대)', 0)
+    val_60s_max = max_summary.get('1960년대', 0)
+    
+    val_modern_min = min_summary.get('현대 (2010년대)', 0)
+    val_60s_min = min_summary.get('1960년대', 0)
+    
     col1, col2, col3 = st.columns(3)
     
-    # 안내 문구도 '1960년대 대비'로 통일했습니다.
     with col1:
-        diff_avg = round(summary.get('현대 (2010년대)', 0) - summary.get('1960년대', 0), 2)
+        diff_avg = round(val_modern_avg - val_60s_avg, 2) if val_60s_avg != 0 else 0
         st.metric(
             label="일평균 기온", 
-            value=f"{summary.get('현대 (2010년대)', '데이터 없음')} °C", 
-            delta=f"1960년대 대비 {diff_avg:+g} °C"
+            value=f"{val_modern_avg} °C" if val_modern_avg != 0 else "데이터 없음", 
+            delta=f"1960년대 대비 {diff_avg:+g} °C" if val_60s_avg != 0 else None
         )
     with col2:
-        diff_max = round(max_summary.get('현대 (2010년대)', 0) - max_summary.get('1960년대', 0), 2)
+        diff_max = round(val_modern_max - val_60s_max, 2) if val_60s_max != 0 else 0
         st.metric(
             label="평균 최고 기온", 
-            value=f"{max_summary.get('현대 (2010년대)', '데이터 없음')} °C", 
-            delta=f"1960년대 대비 {diff_max:+g} °C"
+            value=f"{val_modern_max} °C" if val_modern_max != 0 else "데이터 없음", 
+            delta=f"1960년대 대비 {diff_max:+g} °C" if val_60s_max != 0 else None
         )
     with col3:
-        diff_min = round(min_summary.get('현대 (2010년대)', 0) - min_summary.get('1960년대', 0), 2)
+        diff_min = round(val_modern_min - val_60s_min, 2) if val_60s_min != 0 else 0
         st.metric(
             label="평균 최저 기온", 
-            value=f"{min_summary.get('현대 (2010년대)', '데이터 없음')} °C", 
-            delta=f"1960년대 대비 {diff_min:+g} °C"
+            value=f"{val_modern_min} °C" if val_modern_min != 0 else "데이터 없음", 
+            delta=f"1960년대 대비 {diff_min:+g} °C" if val_60s_min != 0 else None
         )
 
     st.markdown("---")
@@ -149,15 +159,12 @@ try:
     # --- 연도별 추세선 ---
     st.subheader("연도별 평균 기온 타임라인 (1960년대 vs 현대)")
     timeline_data = filtered_data.groupby(['Year', 'Era'])['Avg_Temp'].mean().reset_index()
-    
-    # 축 밀착을 위한 문자열 변환 및 카테고리 축 설정 유지
     timeline_data['Year_str'] = timeline_data['Year'].astype(str)
     
     fig_line = go.Figure()
-    # 1960년대 선
     df_60s = timeline_data[timeline_data['Era'] == '1960년대']
     fig_line.add_trace(go.Scatter(x=df_60s['Year_str'], y=df_60s['Avg_Temp'], name='1960년대', mode='lines+markers', line=dict(color='#3498db', width=3)))
-    # 현대 선
+    
     df_mod = timeline_data[timeline_data['Era'] == '현대 (2010년대)']
     fig_line.add_trace(go.Scatter(x=df_mod['Year_str'], y=df_mod['Avg_Temp'], name='현대 (2010년대)', mode='lines+markers', line=dict(color='#e74c3c', width=3)))
     
@@ -171,4 +178,3 @@ try:
 
 except Exception as e:
     st.error(f"파일을 로드하거나 처리하는 중 오류가 발생했습니다: {e}")
-    st.info("데이터 파일('ta_20260601093156.csv')이 동일한 저장소 폴더에 있는지 확인해 주세요.")
